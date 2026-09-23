@@ -1,0 +1,380 @@
+{
+  "format": 1,
+  "created_at": "2026-09-23T09:52:48.744910+00:00",
+  "upstream_repository": "https://github.com/wangc219/deep-research",
+  "upstream_commit": "9b67368c6baeb731f89e1076da8a1b68ff52178a",
+  "local_review_base": "49edb184642009d1f1994d41b63853d20315233d",
+  "source_head": "49edb184642009d1f1994d41b63853d20315233d",
+  "patch_files": [
+    {
+      "path": ".gitignore",
+      "before_sha256": "fef633f9eb7d2415f6b4a77622d14a2e0bd9319d5e072ed86dbb0cca6174a935",
+      "after_sha256": "577a3e9787c247726d3e0376adf9f4f246d15b806e77d2bfca03680ba133aeb4"
+    },
+    {
+      "path": "README.md",
+      "before_sha256": "2194ba2f9b4c0febcd3418530214a72cd46472ed4b312f20b04a1c26edd86edc",
+      "after_sha256": "eb4837dab56a795931242976866bb9d03ff64a0d88d1a1b9c33768b04f42d24c"
+    },
+    {
+      "path": "apps/web/src/main.jsx",
+      "before_sha256": "4d5e63c5b747a77bcd02fc27dcdfff07caa652937d5b1f2ad9b676b85e05c523",
+      "after_sha256": "aab82ed94141face29cc7fcd8b855a69e907060003649a4e6aa5ad46a0409343"
+    },
+    {
+      "path": "apps/web/vite.config.js",
+      "before_sha256": "ea00cc4d4f3d1eb21f36addba16232d0bcc2ad5b76c7d10ac725cc43d09f1c7c",
+      "after_sha256": "b15d7f1e19e6bd05f1a12ecc00d9f413dc37335617955b90b9446291e74f3383"
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "size": 3378,
+      "sha256": "005eeea88507e22aa65ebd78a70c28c9cdd3bf345215288317e50700a07f40f8",
+      "mode": "0644"
+    },
+    {
+      "path": "apply_upgrade.py",
+      "size": 12541,
+      "sha256": "5d0d26ffdbdb09d5a3affc897b782cc564a034e58643582b7af3dcb74d013ff4",
+      "mode": "0755"
+    },
+    {
+      "path": "navigation.patch",
+      "size": 4524,
+      "sha256": "54ee4c2050c1e61fdf3f63dbe0c94fe5be74bb8e4560119ee20ca86d87b19999",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/.env.example",
+      "size": 699,
+      "sha256": "648f6078a6e8b08accb520e5c2c4d195654a14cb4aded653bf86d3ca33d5a949",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/.gitignore",
+      "size": 147,
+      "sha256": "2b6c3d6278c7c8606ebafbdb1f6d2001be738624a2af233f1a92fc4c65c7053e",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/CHANGES_FROM_DEEP_RESEARCH.md",
+      "size": 459,
+      "sha256": "59bf5af9117bce42183af6f2d75dea6b033f74d7caccb0cd3374402524e44ff5",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/README.md",
+      "size": 4527,
+      "sha256": "bdef27a85d1d31a1af028edac394ca38259c78e8db99962c24702aaf36d2f2b8",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/THIRD_PARTY_NOTICES.md",
+      "size": 1074,
+      "sha256": "428e7cce4c0800405c0d90557ce2b2eff44aad8889eacb88d8b1eea851e2f389",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/docs/ACCEPTANCE.md",
+      "size": 308,
+      "sha256": "3dfaa9a6ce0e3058f4f7db4b09b15a68f805e8d21766b508c45513c1f30ab0e9",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/docs/UPSTREAM.md",
+      "size": 1223,
+      "sha256": "81bf56e8149c9ac0b0976d40b601dde78f91d7b025c6512ed88b224e3bec2302",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/docs/WORK_LOG.md",
+      "size": 4409,
+      "sha256": "3503cf994a6375d4db83a6aa717b9570749f969664f57caee5f6da0917be7cc7",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/lib/common.mjs",
+      "size": 757,
+      "sha256": "a90640d57ad19a26617ce6e6144159ebc005a51d4b3392730ebccb0435e8d592",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/lib/parser.mjs",
+      "size": 5023,
+      "sha256": "213329bbab513b638e66e35d19d6698e7bff1341d5182d6fa36de96f116719eb",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/lib/providers.mjs",
+      "size": 10962,
+      "sha256": "dcfbbed6ff215fed8da8183709f8e14441387abd92cc74996546cc0f8f3b252d",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/lib/research.mjs",
+      "size": 22765,
+      "sha256": "6382f653848ff5804774f76d4de04e09a75abd3559503e3034495c955cfc1ad7",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/lib/store.mjs",
+      "size": 23398,
+      "sha256": "0b67bca80a256b9bfaa41a4a9749cbeb9c072df0139dc85f92b0a7d747d170c5",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/package.json",
+      "size": 355,
+      "sha256": "e54dad32bfef517ec4987df633d963b1c951f132024928f33d9d8f2a69dcd264",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/public/app.js",
+      "size": 31897,
+      "sha256": "119288ab9bc6d17b9c14f006591a9b1406be6aa70bb0b8e96607aba7c14bc26c",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/public/index.html",
+      "size": 8064,
+      "sha256": "17845b932fdbbb0afcde5d8a6ba8c92c9f7f7a04fb84e6b4229e7711d9e315c5",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/public/styles.css",
+      "size": 13855,
+      "sha256": "589f23b7f7e005a18b6761e60b3567a2197c35d9b9cba3ca4de9c9c4124a7d68",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/requirements-parser.txt",
+      "size": 119,
+      "sha256": "9a8c77e52e293b715655f998fd2d772aed097d81f578908d7292aa2f73ad890d",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/scripts/build.mjs",
+      "size": 2693,
+      "sha256": "7861a5e910786ab1b249092640994b0d602052418308fb5e16c4430f8ef5d176",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/scripts/doctor.mjs",
+      "size": 2185,
+      "sha256": "fb4bb023b378aca5c2c7f9dfa40a4cd77a0db799d821081095b19ebaaa3508f9",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/scripts/parse-document.py",
+      "size": 7818,
+      "sha256": "e379ab876232e8b01fe896224949968d059ea3b1c99826505b2e6e4970c6bdc7",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/scripts/setup.mjs",
+      "size": 1260,
+      "sha256": "523c8b04318d05cb5a8b5ce4ee4e1c59f87e6de1e08e126820761ad682674c1e",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/scripts/test.mjs",
+      "size": 808,
+      "sha256": "9d19d3d0a3f77f12f94964e5872c3575cba3f46dbc40e8ab20b4e6ecce85caa1",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/scripts/verify-upstream.mjs",
+      "size": 1621,
+      "sha256": "0e8f1a9411506fb236cda132ecf58c03276f0cbe013197762f6374a1ca00a9b1",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/server.mjs",
+      "size": 16167,
+      "sha256": "332d10a488ccf611be05302a41bc8fefb887d38f72008d08a3f392c2de2b04d7",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/start.ps1",
+      "size": 377,
+      "sha256": "16fa896c5e67a26385c21b994ab2a062b0932096f563dc74e44cf8cb0c4dc276",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/start.sh",
+      "size": 324,
+      "sha256": "2cf841d5060e9cedb0568a184e94cf0783cc969ece8ee7e716494e2e226889d4",
+      "mode": "0755"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/contract.test.mjs",
+      "size": 16551,
+      "sha256": "7afcb9eddd896c666fb5f2e4601b443204da9dfd2f1a11cdd47a302b3b49fe84",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/fixture.mjs",
+      "size": 4684,
+      "sha256": "009dea1bf2e79f3621907c7dfd516dfd6c0c9361bb4cbbbb6a585af809537d52",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/native-store.test.mjs",
+      "size": 4825,
+      "sha256": "572d7980762f212f7bfe4265aa088bc1c9d72e6b1abfc5baecd8f7998d34f882",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/parser-fixtures.mjs",
+      "size": 2727,
+      "sha256": "1625930989bb2c450f50b9edd67a6f78c753db616eaffa32d4a50f92c41cb31d",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/parser-store.test.mjs",
+      "size": 8003,
+      "sha256": "a6ceaa60910191cb6914e51d6c83173a69b19477dfe35e64cbdf5179969cedd4",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/parser.test.mjs",
+      "size": 5140,
+      "sha256": "0f72496c21dc90871b27c0a6e0abb7f3b85b90191e8a857091e361fad47b71f7",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/providers.test.mjs",
+      "size": 7212,
+      "sha256": "23e2daad28729f83f4125827e31a40956a4ad44e47a155f50070a84fd8162bea",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/research-engine.test.mjs",
+      "size": 17830,
+      "sha256": "0654e5f5c7ea6f02294402944613eab2155f28b6816280cb554f3179793a014b",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/ui-create.test.mjs",
+      "size": 1358,
+      "sha256": "91a40cfce6aade346e95f1bca98ce885ff95471a77c02824fcfd709bff7476e4",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/ui-harness.mjs",
+      "size": 4579,
+      "sha256": "cff68321f151e9f1346b79c97fbe3f79c365349c5034c65507daa0c71e16690d",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/ui-native-auth.test.mjs",
+      "size": 7555,
+      "sha256": "bf4f441492c6960f02da058462faa885e2e9879e630edc50cca18d670959a582",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/ui-queue.test.mjs",
+      "size": 5637,
+      "sha256": "ed3de18cf253341850863cb60c118c2fc334f36de0e6b3abd6f8270c9d2c1380",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/ui-revocation.test.mjs",
+      "size": 3343,
+      "sha256": "6659c59c8b4e42e48a0aed3920c0a0df7e022be3f38b92f99f158ff2eeaea082",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/ui-session.test.mjs",
+      "size": 5016,
+      "sha256": "d804442ca98a72c8d5481859533ba5e3345c2be7a6e8f7506fac0428b43eba0a",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/tests/workbench-http.test.mjs",
+      "size": 13329,
+      "sha256": "18cb420f32f86ecb267b00ccdd367e5f91ea7225af7e8c751cc9b81ac0ce787d",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/third-party/YUXI-LICENSE",
+      "size": 1082,
+      "sha256": "93ae1dca19d82831cfd514eb0f148f326a27f8d2d757662e8e2703a48658543e",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/general-research/upstream.lock.json",
+      "size": 8011,
+      "sha256": "19918cde7fd0dc0c81f57321c549169168e437182ee23886ac36e50482338149",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/general.html",
+      "size": 328,
+      "sha256": "60799798ed605d4a5268755b48a4a75a9525596181976cc166b97476128740fb",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/src/features/deep-thinking/deep-event-stream.js",
+      "size": 7998,
+      "sha256": "03b10c451fa1ba6c46d4e44cd7dfb2139a3630d967f9f125691524302c4bb8b7",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/src/features/general-research/GeneralWorkbench.jsx",
+      "size": 32184,
+      "sha256": "67d91a9b47852b5194f1211fab013aef84b3244c6a798e71bfa4cc65e871978f",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/src/features/general-research/general-state.mjs",
+      "size": 6990,
+      "sha256": "61d47a6067d332e734e408d354246fadd7304216cfb27b5d0b48e883d8b8c3e5",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/src/features/general-research/general-state.test.mjs",
+      "size": 8056,
+      "sha256": "66d4ac5fb9008a9375cd5a1a743fc1ce62baf80ba681a64413a3353701ffd959",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/src/features/general-research/general.css",
+      "size": 9633,
+      "sha256": "ae94b4914ef2580571b85271e5de535a699f5c5039347b9f141daa4d4638cfb0",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/src/general-main.jsx",
+      "size": 379,
+      "sha256": "59be942fabdb5605bd588cca493f7d84c7f2c056bb8683b42f6642f50c52f34d",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/apps/web/vite.general.config.js",
+      "size": 417,
+      "sha256": "f55361993224319aec13add4f1a8784d490b63e68bb7e3f661018b14e5a1ea72",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/docs/GENERAL_RESEARCH_ACCEPTANCE.md",
+      "size": 12240,
+      "sha256": "e0a335ccf96d55223037cc6bc2696194fe113ff2bce2ab23a2d93884d5e66cab",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/docs/GENERAL_RESEARCH_CHANGES.md",
+      "size": 7185,
+      "sha256": "fdc6d4f63d60cd658a31ba551540cd2f4f040a965f549f85de5f0232d417bce6",
+      "mode": "0644"
+    },
+    {
+      "path": "overlay/docs/GENERAL_RESEARCH_WORK_LOG.md",
+      "size": 3419,
+      "sha256": "ddaa1d0fe097e516e95402bd60e98538e912ca9a271785ca37aa459d8a7cdf4e",
+      "mode": "0644"
+    }
+  ]
+}

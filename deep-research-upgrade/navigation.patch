@@ -1,0 +1,77 @@
+diff --git a/.gitignore b/.gitignore
+index 448cd95748caac051c53686bcd9da3bcb0e4e36f..be048262acabfe7f993bb87a58dff0c0049acc60 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -28,6 +28,7 @@ venv/
+ node_modules/
+ .pnpm-store/
+ apps/web/dist/
++apps/web/dist-general/
+ apps/web/playwright-report/
+ apps/web/test-results/
+ 
+diff --git a/README.md b/README.md
+index bf45aa0130082d21442f53eb3ccef4c2a2e1abd2..27f180407026945e6e2f06324315f22320c60253 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,7 @@
+ # Deep Research 多智能体系统
+ 
++> 新增通用研究与资料管理：在本项目内选择需求文档、审核计划、查看五个 Agent 的进度并导出带来源报告。[安装与使用](apps/general-research/README.md) · [版本改动](docs/GENERAL_RESEARCH_CHANGES.md) · [验收与限制](docs/GENERAL_RESEARCH_ACCEPTANCE.md)。通用模块独立运行，默认入口 http://127.0.0.1:4196/ 。
++
+ 面向装备市场需求挖掘、制胜机理研判和文字能力画像生成的可配置多智能体系统。当前版本已形成 CLI、API、持久化 worker、React 工作台和可审计交付产物的首版闭环。
+ 
+ ## 已实现能力
+diff --git a/apps/web/src/main.jsx b/apps/web/src/main.jsx
+index 52aa84f57a26de7fbc5d9a58757a609e38673251..5ecfdea4a16c2b6ec756eb6b04df1bfa4650c3fc 100644
+--- a/apps/web/src/main.jsx
++++ b/apps/web/src/main.jsx
+@@ -629,6 +629,7 @@ function App() {
+   return <div className="app-shell">
+     <header className="topbar">
+       <div className="brand-mark"><img src={`${import.meta.env.BASE_URL}favicon.svg`} alt=""/></div><div className="brand-copy"><b>JS装备需求挖掘</b><span>DEEP RESEARCH WORKBENCH</span></div>
++      <a href={`${import.meta.env.BASE_URL}general.html`} className="topbar-route">通用研究与资料管理 ↗</a>
+       <button className="command-trigger" onClick={() => setPaletteOpen(true)} title={`打开命令面板（${COMMAND_KEY_LABEL} + K）`}><Search size={14}/><span>搜索任务、跳转视图…</span><kbd>{COMMAND_KEY_LABEL}</kbd><kbd>K</kbd></button>
+       <div className={`service-state ${healthy && runtime.worker_online ? 'online' : 'offline'}`} title={runtime.worker_online ? `在线 Worker ${runtime.online_worker_count || 0} 个；可用槽位 ${runtime.available_slots || 0}；活动任务 ${(runtime.active_run_ids || []).join('、') || '无'}；排队 ${runtime.pending_count || 0} 项` : '请启动独立 research worker'}><i/>{!healthy ? 'API 未连接' : runtime.worker_online ? `并行槽位 ${runtime.active_count || 0}/${runtime.worker_capacity || 0} · 排队 ${runtime.pending_count || 0}` : 'Worker 未启动'}</div>
+       <button className="topbar-help icon-button" onClick={() => setShortcutsOpen(true)} title="查看键盘快捷键（?）" aria-label="查看键盘快捷键"><Keyboard size={16}/></button>
+diff --git a/apps/web/vite.config.js b/apps/web/vite.config.js
+index 6ee25e7429bc38d8213868c9eb8ced1841f4b1e1..871acb21206de57f63097dfcd017a13ee24e51b4 100644
+--- a/apps/web/vite.config.js
++++ b/apps/web/vite.config.js
+@@ -1,5 +1,6 @@
+ import {defineConfig, loadEnv} from 'vite';
+ import react from '@vitejs/plugin-react';
++import {fileURLToPath} from 'node:url';
+ 
+ export default defineConfig(({mode}) => {
+   const env = loadEnv(mode, '../../', '');
+@@ -29,12 +30,29 @@ export default defineConfig(({mode}) => {
+       },
+     },
+     envDir: '../../',
++    build: {rollupOptions: {input: {
++      index: fileURLToPath(new URL('./index.html', import.meta.url)),
++      general: fileURLToPath(new URL('./general.html', import.meta.url)),
++    }}},
+     server: {
+       host,
+       port,
+       strictPort: true,
+       allowedHosts,
+       proxy: {
++        '/general-api': {
++          target: 'http://127.0.0.1:4196',
++          changeOrigin: true,
++          rewrite: path => path.replace(/^\/general-api/, '/api'),
++          // Rewrite only a matching browser origin from a loopback dev host.
++          // Other origins remain unchanged for the backend to reject.
++          configure: proxy => proxy.on('proxyReq', (request, incoming) => {
++            const localHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(incoming.headers.host || '');
++            if (localHost && incoming.headers.origin === `http://${incoming.headers.host}`) {
++              request.setHeader('origin', 'http://127.0.0.1:4196');
++            }
++          }),
++        },
+         '/api': process.env.VITE_API_PROXY_TARGET
+           || env.VITE_API_PROXY_TARGET
+           || 'http://127.0.0.1:8000',

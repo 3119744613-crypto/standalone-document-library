@@ -1,0 +1,4 @@
+# Text-only PDF/DOCX parsing; no OCR, hosted parser or model is required.
+pypdf==6.10.0
+python-docx==1.2.0
+lxml==6.1.1

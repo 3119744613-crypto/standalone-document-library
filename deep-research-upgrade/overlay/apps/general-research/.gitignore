@@ -1,0 +1,16 @@
+dist/
+.env
+.env.*
+!.env.example
+.runtime/
+node_modules/
+*.log
+.DS_Store
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+coverage/
+.build/
+.venv/
