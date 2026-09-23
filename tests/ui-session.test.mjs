@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {harness, json, deferred, until, drain} from './ui-harness.mjs';
 
-test('unconfigured backend cannot be presented as a successful connection', async () => {
+test('unreachable local service cannot be presented as a successful connection', async () => {
   const app = harness(({path}) => path === '/api/status' ? json({backendConfigured: false, backendReachable: false}) : undefined);
-  await until(() => app.el('connection-title').textContent.includes('等待'));
+  await until(() => app.el('connection-title').textContent.includes('暂不可用'));
   assert.equal(app.el('login-submit').disabled, true);
   assert.equal(app.calls.length, 1);
 });
@@ -34,7 +34,7 @@ test('logout invalidates an in-flight result and clears credentials and visible 
   pending.resolve(json({results: [{file_id: 'doc-a', content: 'old data'}]})); await drain();
   assert.equal(app.el('workspace').hidden, true);
   assert.equal(app.el('auth-section').hidden, false);
-  assert.equal(app.el('api-key').value, '');
+  assert.equal(app.el('password').value, '');
   assert.equal(app.el('document-rows').children.length, 0);
   assert.equal(app.el('query-sources').children.length, 0);
 });
@@ -63,16 +63,16 @@ test('401 with an invalid response body still discards the entire authenticated 
   assert.equal(app.el('auth-section').hidden, false);
 });
 
-test('switching authentication methods invalidates old login without erasing new input', async () => {
+test('cancelled authentication ignores a late token without erasing new input', async () => {
   const pending = deferred();
   const app = harness(({path}) => path === '/api/login' ? pending.promise : undefined);
   await until(() => !app.el('login-submit').disabled);
   app.el('username').value = 'synthetic'; app.el('password').value = 'only-test';
   app.el('login-form').fire('submit');
   await until(() => app.calls.some(call => call.path === '/api/login'));
-  app.el('choose-key').fire('click'); app.el('api-key').value = 'new-unsubmitted-key';
+  app.el('cancel-login').fire('click'); app.el('password').value = 'new-unsubmitted-password';
   pending.resolve(json({access_token: 'old-login-token'})); await drain();
-  assert.equal(app.el('api-key').value, 'new-unsubmitted-key');
+  assert.equal(app.el('password').value, 'new-unsubmitted-password');
   assert.equal(app.calls.filter(call => call.path === '/api/me').length, 0);
 });
 

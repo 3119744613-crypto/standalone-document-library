@@ -14,10 +14,10 @@ test('successful creation followed by a failed list refresh reports both outcome
   await app.login();
   app.el('new-library').fire('click');
   app.el('create-name').value = 'Software notes';
-  app.el('create-type').value = 'milvus';
-  app.el('create-model').value = 'synthetic-embedding';
   app.el('create-form').fire('submit');
   await until(() => created); await drain();
+  const creation = app.calls.find(call => call.path === '/api/databases' && call.options.method === 'POST');
+  assert.deepEqual(JSON.parse(creation.options.body), {database_name: 'Software notes', description: ''});
   assert.match(app.el('global-message').textContent, /已创建|创建.*成功/);
   assert.match(app.el('global-message').textContent, /刷新.*失败/);
   assert.doesNotMatch(app.el('global-message').textContent, /列表已刷新/);

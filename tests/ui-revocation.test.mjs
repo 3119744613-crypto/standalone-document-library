@@ -42,7 +42,7 @@ test('logout during library creation must not leave the next account create butt
  const app=harness(({path,options})=>path==='/api/databases'&&options.method==='POST'?pending.promise:undefined);
  await app.login();
  app.el('new-library').fire('click');
- app.el('create-name').value='Synthetic notes';app.el('create-type').value='milvus';app.el('create-model').value='synthetic-embedding';
+ app.el('create-name').value='Synthetic notes';
  app.el('create-form').fire('submit');
  await until(()=>app.calls.some(call=>call.path==='/api/databases'&&call.options.method==='POST'));
  app.el('logout').fire('click');await app.login();app.el('new-library').fire('click');

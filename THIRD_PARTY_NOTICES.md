@@ -1,13 +1,15 @@
 # Third-party notices
 
-The HTTP adapter targets [Yuxi](https://github.com/xerrors/Yuxi) at commit
-`d633378c7ea55618ac659a547bfe90f74b29af4c`. Its MIT copyright and permission
-notice is preserved verbatim in [third-party/YUXI-LICENSE](third-party/YUXI-LICENSE).
-The reference source manifest is [upstream.lock.json](upstream.lock.json).
+[Yuxi](https://github.com/xerrors/Yuxi), commit
+`d633378c7ea55618ac659a547bfe90f74b29af4c`, was reviewed as a design reference
+for document lifecycle states and source previews. Its MIT copyright and permission
+notice remains in [third-party/YUXI-LICENSE](third-party/YUXI-LICENSE), with the
+historical reference manifest in [upstream.lock.json](upstream.lock.json).
 
-This repository does not bundle the Yuxi server, its frontend, or its deployment
-dependencies. Those components may carry their own licenses.
+Version 0.2 implements its own local document service and does not bundle or call
+the Yuxi server, frontend, agent framework, database, models, or deployment services.
+The older HTTP adapter is retained only in Git history.
 
-The preserved Yuxi license identifies the upstream work. It does not assign a new
-license to this adapter's original code. No repository-wide license has been
-selected by the repository owner yet.
+The preserved notice identifies the upstream reference. It does not assign a new
+license to this repository's original code. The repository owner has not selected
+a repository-wide license yet.

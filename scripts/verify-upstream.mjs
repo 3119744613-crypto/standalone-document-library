@@ -10,7 +10,7 @@ if (!source) throw new Error('Usage: node scripts/verify-upstream.mjs /absolute/
 const sourceRoot = resolve(source);
 const lock = JSON.parse(await readFile(resolve(moduleRoot, 'upstream.lock.json'), 'utf8'));
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], {cwd: sourceRoot, encoding: 'utf8'}).trim();
-if (commit !== lock.commit) throw new Error('Yuxi commit differs from the reviewed version; review its API before connecting.');
+if (commit !== lock.commit) throw new Error('Yuxi commit differs from the reviewed version; this optional design-reference check requires the recorded commit.');
 let checked = 0;
 for (const entry of lock.source_files) {
   if (isAbsolute(entry.path) || entry.path.split('/').includes('..')) throw new Error('Invalid path in source lock.');

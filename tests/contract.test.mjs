@@ -1,330 +1,275 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {once} from 'node:events';
 import http from 'node:http';
-import {createLibraryServer} from '../server.mjs';
-import {validateUpstream} from '../lib/upstream.mjs';
-import {createFixture, FIXTURE_ACCOUNTS} from './fixture.mjs';
+import {createFixture, fileForm, OWNER} from './fixture.mjs';
 
-// These tests use real HTTP and a synthetic upstream. They do not validate a
-// deployed Yuxi installation, its real database, or its permission middleware.
-const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function until(predicate, timeout = 1500) {
-  const start = Date.now();
-  while (!predicate()) {assert.ok(Date.now() - start < timeout, 'condition was not reached before timeout'); await pause(10);}
-}
-async function setup(t, options = {}) {
-  const fixture = createFixture({transitionMs: 80});
-  const upstream = await fixture.listen();
-  const server = createLibraryServer({upstream, timeoutMs: 1200, ...options});
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const base = `http://127.0.0.1:${server.address().port}`;
-  t.after(async () => {server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await fixture.close();});
-  const request = async (path, {method = 'GET', role = 'admin', body, headers = {}, signal} = {}) => {
-    const requestHeaders = {...headers};
-    if (role) requestHeaders.Authorization = `Bearer ${FIXTURE_ACCOUNTS[role]?.token || role}`;
-    if (body != null && !(body instanceof FormData)) requestHeaders['Content-Type'] = 'application/json';
-    const response = await fetch(`${base}${path}`, {method, headers: requestHeaders, signal, body: body == null ? undefined : body instanceof FormData ? body : JSON.stringify(body)});
-    return {status: response.status, headers: response.headers, data: await response.json()};
-  };
-  return {fixture, server, base, request};
-}
-function seed(fixture, {kb = 'software-docs', id = 'seed-file', status = 'indexed'} = {}) {
-  fixture.state.documents.set(id, {kb_id: kb, file_id: id, filename: 'software-guide.md', content: '# Software guide\nUse the Save button to preserve a note.', status, hash: 'seed-hash', created_at: new Date().toISOString()});
-  return id;
-}
-function fileForm(name = 'software-note.md', content = '# Notes\nThe export button writes Markdown.') {
-  const form = new FormData();
-  form.append('file', new Blob([content], {type: 'text/markdown'}), name);
-  return form;
+const documentPath = (kb, id) => `/api/databases/${kb}/documents/${id}`;
+async function query(fixture, kb, text) {
+  const result = await fixture.request(`/api/databases/${kb}/query`, {method: 'POST', body: {query: text}});
+  assert.equal(result.status, 200, JSON.stringify(result.data));
+  assert.ok(Array.isArray(result.data.results));
+  return result.data.results;
 }
 
-test('unconfigured server reports not_configured and refuses protected upstream work', async t => {
-  const {request, fixture} = await setup(t, {upstream: null});
-  const status = await request('/api/status', {role: null});
-  assert.equal(status.status, 200);
-  assert.equal(status.data.backendConfigured, false);
-  assert.equal(status.data.backendReachable, false);
-  assert.equal(status.data.backendStatus, 'not_configured');
-  const result = await request('/api/databases');
-  assert.equal(result.status, 503);
-  assert.equal(fixture.state.audit.filter(x => x.kind === 'request').length, 0);
+test('a fresh local store requires one-time owner setup and no external backend', async t => {
+  const fixture = await createFixture(t, {initialize: false});
+  const initial = await fixture.request('/api/status', {auth: null});
+  assert.equal(initial.status, 200);
+  assert.equal(initial.data.setupRequired, true);
+  assert.equal(initial.data.backendStatus, 'setup_required');
+  assert.equal(initial.data.storage, 'sqlite');
+  assert.equal(initial.data.searchMode, 'keyword');
+  assert.equal((await fixture.request('/api/databases', {auth: null})).status, 401);
+  assert.equal((await fixture.request('/api/setup', {method: 'POST', body: {...OWNER, password: 'short'}})).status, 400);
+  const setup = await fixture.request('/api/setup', {method: 'POST', body: OWNER});
+  assert.equal(setup.status, 201);
+  assert.ok(setup.data.access_token);
+  const ready = await fixture.request('/api/status', {auth: null});
+  assert.equal(ready.data.setupRequired, false);
+  assert.equal(ready.data.backendStatus, 'ready');
+  assert.equal((await fixture.request('/api/setup', {method: 'POST', body: {...OWNER, username: 'second-owner'}})).status, 409);
+  const me = await fixture.request('/api/me', {auth: setup.data.access_token});
+  assert.equal(me.status, 200);
+  assert.equal(me.data.user.username, OWNER.username);
+  assert.ok(!JSON.stringify(me.data).includes(OWNER.password));
+  assert.ok(!Object.keys(me.data.user).some(key => /password|salt|hash|token/i.test(key)));
 });
 
-test('upstream URL rejects remote HTTP, user info, paths, query and fragments', () => {
-  for (const url of ['http://example.com', 'https://user:password@example.com', 'https://example.com/api', 'https://example.com/?secret=1', 'https://example.com/#x', 'file:///tmp/test']) {
-    assert.throws(() => validateUpstream(url));
+test('concurrent initial setup creates exactly one owner', async t => {
+  const fixture = await createFixture(t, {initialize: false});
+  const attempts = await Promise.all([OWNER, {...OWNER, username: 'another-owner'}].map(body => fixture.request('/api/setup', {method: 'POST', body})));
+  assert.deepEqual(attempts.map(x => x.status).sort(), [201, 409]);
+  const winning = attempts.find(x => x.status === 201).data.access_token;
+  assert.equal((await fixture.request('/api/me', {auth: winning})).status, 200);
+});
+
+test('password login, per-session logout and anonymous rejection use real stored credentials', async t => {
+  const fixture = await createFixture(t);
+  const firstToken = fixture.token;
+  assert.equal((await fixture.request('/api/login', {method: 'POST', auth: null, body: {...OWNER, password: 'incorrect password'}})).status, 401);
+  assert.equal((await fixture.request('/api/me', {auth: 'invented-token'})).status, 401);
+  assert.equal((await fixture.request('/api/me', {auth: null, headers: {Cookie: `session=${firstToken}`}})).status, 401);
+  const secondToken = await fixture.login();
+  assert.notEqual(firstToken, secondToken);
+  assert.equal((await fixture.request('/api/logout', {method: 'POST', auth: firstToken, body: {}})).status, 200);
+  assert.equal((await fixture.request('/api/me', {auth: firstToken})).status, 401);
+  assert.equal((await fixture.request('/api/me', {auth: secondToken})).status, 200);
+});
+
+test('libraries are created and listed without model configuration', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary('User manuals');
+  const result = await fixture.request('/api/databases');
+  assert.equal(result.status, 200);
+  assert.equal(result.data.canCreate, true);
+  assert.equal(result.data.databases.length, 1);
+  assert.equal(result.data.databases[0].kb_id, kb);
+  assert.equal(result.data.databases[0].name, 'User manuals');
+  assert.equal(result.data.databases[0].kb_type, 'local');
+  assert.equal(result.data.databases[0].can_manage, true);
+});
+
+test('actual upload, UTF-8 parsing and indexing produce line-cited keyword matches', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const text = '# 软件使用说明\n点击导出按钮保存文档。\nThe export button saves Markdown.\nEnd of document.';
+  const id = await fixture.upload(kb, text, '软件说明.md');
+  assert.deepEqual(await query(fixture, kb, '导出按钮'), []);
+  assert.equal((await fixture.request(`${documentPath(kb, id)}/index`, {method: 'POST', body: {}})).status, 409);
+  await fixture.processDocument(kb, id, 'parse');
+  assert.deepEqual(await query(fixture, kb, '导出按钮'), [], 'parsed documents are not indexed yet');
+  const preview = await fixture.request(`${documentPath(kb, id)}/content`);
+  assert.equal(preview.status, 200);
+  assert.equal(preview.data.content, text);
+  assert.equal(preview.data.start_line, 1);
+  assert.equal(preview.data.total_lines, 4);
+  await fixture.processDocument(kb, id, 'index');
+  for (const term of ['导出按钮', 'export']) {
+    const matches = await query(fixture, kb, term);
+    assert.ok(matches.length > 0, term);
+    assert.equal(matches[0].kb_id, kb);
+    assert.equal(matches[0].file_id, id);
+    assert.equal(matches[0].metadata.filename, '软件说明.md');
+    assert.ok(matches[0].metadata.start_line >= 1);
+    assert.ok(matches[0].metadata.end_line <= 4);
+    assert.match(matches[0].content, new RegExp(term));
   }
-  assert.equal(validateUpstream('http://127.0.0.1:9000'), 'http://127.0.0.1:9000');
-  assert.equal(validateUpstream('https://example.com'), 'https://example.com');
+  assert.deepEqual(await query(fixture, kb, 'not-present-76193'), []);
 });
 
-test('status performs a read-only reachability request and discloses source pin', async t => {
-  const {request, fixture} = await setup(t);
-  const status = await request('/api/status', {role: null});
-  assert.equal(status.status, 200);
-  assert.equal(status.data.backendConfigured, true);
-  assert.equal(status.data.backendReachable, true);
-  assert.equal(status.data.upstreamCommit, 'd633378c7ea55618ac659a547bfe90f74b29af4c');
-  assert.ok(fixture.state.audit.some(x => x.kind === 'request' && x.path === '/api/auth/check-first-run' && x.method === 'GET' && x.role === null));
+test('same-content upload is rejected while same-name different content remains separate', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const original = 'First document text';
+  const first = await fixture.upload(kb, original, 'notes.txt');
+  const duplicate = await fixture.request(`/api/databases/${kb}/upload`, {method: 'POST', body: fileForm('other-name.md', original)});
+  assert.equal(duplicate.status, 409);
+  const changed = await fixture.request(`/api/databases/${kb}/upload`, {method: 'POST', body: fileForm('notes.txt', 'Second document text')});
+  assert.equal(changed.status, 201);
+  assert.notEqual(changed.data.document.file_id, first);
+  assert.equal(changed.data.hasSameName, true);
+  const list = await fixture.request(`/api/databases/${kb}/documents`);
+  assert.equal(list.data.total, 2);
+  for (const [id, content] of [[first, original], [changed.data.document.file_id, 'Second document text']]) {
+    await fixture.processDocument(kb, id, 'parse');
+    assert.equal((await fixture.request(`${documentPath(kb, id)}/content`)).data.content, content);
+  }
 });
 
-test('login sends official OAuth form; me uses explicit per-request token and strips secrets', async t => {
-  const {request, fixture} = await setup(t);
-  const login = await request('/api/login', {method: 'POST', role: null, body: {username: FIXTURE_ACCOUNTS.admin.username, password: FIXTURE_ACCOUNTS.admin.password}});
-  assert.equal(login.status, 200);
-  assert.equal(login.data.access_token, FIXTURE_ACCOUNTS.admin.token);
-  const form = fixture.state.audit.find(x => x.kind === 'login_form');
-  assert.match(form.contentType, /^application\/x-www-form-urlencoded/);
-  const me = await request('/api/me');
-  assert.equal(me.status, 200);
-  assert.equal(me.data.user.uid, 'fixture-admin');
-  assert.ok(!JSON.stringify(me.data).includes('SECRET'));
-  const anonymous = await request('/api/me', {role: null});
-  assert.equal(anonymous.status, 401, 'login must not create a shared global session');
+test('simultaneous duplicate uploads cannot bypass the local uniqueness constraint', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const attempts = await Promise.all(['one.md', 'two.md'].map(name => fixture.request(`/api/databases/${kb}/upload`, {method: 'POST', body: fileForm(name, 'Concurrent duplicate document.')})));
+  assert.deepEqual(attempts.map(x => x.status).sort(), [201, 409]);
+  assert.equal((await fixture.request(`/api/databases/${kb}/documents`)).data.total, 1);
 });
 
-test('API key is passed only as explicit bearer and browser cookies are not forwarded', async t => {
-  const {request, fixture} = await setup(t);
-  const me = await request('/api/me', {role: 'yxkey_synthetic-admin', headers: {Cookie: 'admin-session=DO_NOT_FORWARD'}});
-  assert.equal(me.status, 200);
-  const reads = fixture.state.audit.filter(x => x.kind === 'request' && x.path === '/api/auth/me');
-  assert.equal(reads.length, 1);
-  assert.equal(reads[0].cookieReceived, false);
+test('invalid UTF-8 is recorded as parse failure and never becomes searchable', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const id = await fixture.upload(kb, new Uint8Array([0x61, 0xc3, 0x28, 0xff]), 'invalid.txt');
+  const failed = await fixture.processDocument(kb, id, 'parse', 'error_parsing');
+  assert.equal(failed.status, 'error_parsing');
+  assert.equal((await fixture.request(`${documentPath(kb, id)}/index`, {method: 'POST', body: {}})).status, 409);
+  assert.deepEqual(await query(fixture, kb, 'a'), []);
 });
 
-test('reader uses accessible list with management 403 and cannot inherit administrator libraries', async t => {
-  const {request, fixture} = await setup(t);
-  const admin = await request('/api/databases');
-  assert.equal(admin.data.databases.length, 2);
-  assert.equal(admin.data.canCreate, true);
-  assert.ok(!JSON.stringify(admin.data).includes('SECRET'));
-  const reader = await request('/api/databases', {role: 'reader'});
-  assert.equal(reader.status, 200);
-  assert.deepEqual(reader.data.databases.map(x => x.kb_id), ['software-docs']);
-  assert.equal(reader.data.canCreate, false);
-  assert.equal(reader.data.databases[0].can_manage, false);
-  assert.ok(fixture.state.audit.some(x => x.kind === 'request' && x.path === '/api/knowledge/databases/external' && x.role === 'reader'));
-  const denied = await request('/api/databases/private-notes/documents', {role: 'reader'});
-  assert.ok([403, 404].includes(denied.status));
+test('documents, previews and retrieval remain isolated by their library ID', async t => {
+  const fixture = await createFixture(t);
+  const firstKb = await fixture.createLibrary('First library');
+  const secondKb = await fixture.createLibrary('Second library');
+  const id = await fixture.upload(firstKb, 'Only the first library contains the violet notebook.');
+  await fixture.processDocument(firstKb, id, 'parse');
+  await fixture.processDocument(firstKb, id, 'index');
+  assert.equal((await query(fixture, firstKb, 'violet')).length, 1);
+  assert.deepEqual(await query(fixture, secondKb, 'violet'), []);
+  assert.deepEqual((await fixture.request(`/api/databases/${secondKb}/documents`)).data.documents, []);
+  for (const suffix of ['/content', '/basic']) assert.equal((await fixture.request(`${documentPath(secondKb, id)}${suffix}`)).status, 404);
+  assert.equal((await fixture.request(documentPath(secondKb, id), {method: 'DELETE'})).status, 404);
+  assert.equal((await fixture.request(`${documentPath(firstKb, id)}/content`)).status, 200);
+  await fixture.upload(secondKb, 'Only the first library contains the violet notebook.');
 });
 
-test('401 stays an error and does not make a second request with different authority', async t => {
-  const {request, fixture} = await setup(t);
-  const result = await request('/api/databases', {role: 'invalid-token'});
-  assert.equal(result.status, 401);
-  assert.ok(result.data.error);
-  assert.equal(fixture.state.audit.filter(x => x.kind === 'request').length, 1);
-});
-
-test('reader can open and retrieve visible software notes but cannot upload or delete them', async t => {
-  const {request, fixture} = await setup(t);
-  const id = seed(fixture);
-  const list = await request('/api/databases/software-docs/documents?offset=0&limit=100', {role: 'reader'});
-  assert.equal(list.status, 200);
-  assert.equal(list.data.documents[0].file_id, id);
-  assert.equal(list.data.canManage, false);
-  const content = await request(`/api/databases/software-docs/documents/${id}/content`, {role: 'reader'});
-  assert.equal(content.status, 200);
-  assert.match(content.data.content, /Software guide/);
-  const query = await request('/api/databases/software-docs/query', {role: 'reader', method: 'POST', body: {query: 'Save button'}});
-  assert.equal(query.status, 200);
-  assert.equal(query.data.results[0].file_id, id);
-  assert.ok(!JSON.stringify(query.data).includes('SECRET'));
-  assert.equal((await request('/api/databases/software-docs/upload', {role: 'reader', method: 'POST', body: fileForm()})).status, 403);
-  assert.equal((await request(`/api/databases/software-docs/documents/${id}`, {role: 'reader', method: 'DELETE'})).status, 403);
-});
-
-test('upload registers the uploaded MinIO reference and preserves content hash and size', async t => {
-  const {request, fixture} = await setup(t);
-  const result = await request('/api/databases/software-docs/upload', {method: 'POST', body: fileForm()});
-  assert.equal(result.status, 201);
+test('deletion removes the stored document from previews, metadata and retrieval', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const id = await fixture.upload(kb, 'Temporary software manual: ambermarker.');
+  await fixture.processDocument(kb, id, 'parse');
+  await fixture.processDocument(kb, id, 'index');
+  assert.ok((await query(fixture, kb, 'ambermarker')).length);
+  const result = await fixture.request(documentPath(kb, id), {method: 'DELETE'});
+  assert.equal(result.status, 200);
   assert.equal(result.data.status, 'success');
-  assert.equal(result.data.document.status, 'uploaded');
-  const registration = fixture.state.audit.find(x => x.kind === 'register');
-  const uploadedPath = registration.body.items[0];
-  assert.match(uploadedPath, /^minio:\/\/documents\//);
-  assert.equal(registration.body.params.content_type, 'file');
-  assert.equal(registration.body.params.content_hashes[uploadedPath], fixture.state.uploads.get(uploadedPath).hash);
-  assert.ok(registration.body.params.file_sizes[uploadedPath] > 0);
+  for (const suffix of ['/content', '/basic']) assert.equal((await fixture.request(`${documentPath(kb, id)}${suffix}`)).status, 404);
+  assert.deepEqual(await query(fixture, kb, 'ambermarker'), []);
+  assert.equal((await fixture.request(`/api/databases/${kb}/documents`)).data.total, 0);
+  await fixture.restart();
+  await fixture.login();
+  assert.equal((await fixture.request(`${documentPath(kb, id)}/content`)).status, 404);
+  assert.deepEqual(await query(fixture, kb, 'ambermarker'), []);
 });
 
-for (const status of ['failed', 'partial_failed']) {
-  test(`HTTP 200 registration ${status} is an error with explicit staged upload information`, async t => {
-    const {request, fixture} = await setup(t);
-    fixture.state.registrationFailure = status;
-    const result = await request('/api/databases/software-docs/upload', {method: 'POST', body: fileForm()});
-    assert.ok(result.status >= 400);
-    assert.ok(result.data.error);
-    assert.equal(result.data.staged, true);
-    assert.equal(result.data.registrationFailed, true);
-    assert.ok(!JSON.stringify(result.data).includes('SECRET'));
-    assert.equal(fixture.state.documents.size, 0);
-  });
-}
-
-test('parse returns queued and the document only progresses to parsed; index is a separate action', async t => {
-  const {request, fixture} = await setup(t);
-  const id = seed(fixture, {status: 'uploaded'});
-  const parse = await request(`/api/databases/software-docs/documents/${id}/parse`, {method: 'POST', body: {}});
-  assert.equal(parse.status, 202);
-  assert.equal(parse.data.status, 'queued');
-  assert.ok(parse.data.task_id);
-  assert.notEqual(parse.data.status, 'ready');
-  await until(() => fixture.state.documents.get(id).status === 'parsed');
-  assert.equal(fixture.state.documents.get(id).status, 'parsed');
-  const index = await request(`/api/databases/software-docs/documents/${id}/index`, {method: 'POST', body: {}});
-  assert.equal(index.status, 202);
-  assert.equal(index.data.status, 'queued');
-  const actions = fixture.state.audit.filter(x => x.kind === 'document_action');
-  assert.deepEqual(actions.map(x => x.action), ['parse', 'index']);
-  assert.deepEqual(actions[0].body, {file_ids: [id], params: {}});
+test('list and preview pagination retain complete, non-overlapping real data', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const ids = [];
+  for (let index = 0; index < 3; index++) ids.push(await fixture.upload(kb, `line one ${index}\nline two ${index}\nline three ${index}\nline four ${index}`, `note-${index}.txt`));
+  const first = await fixture.request(`/api/databases/${kb}/documents?offset=0&limit=2`);
+  const second = await fixture.request(`/api/databases/${kb}/documents?offset=2&limit=2`);
+  assert.equal(first.data.total, 3);
+  assert.equal(first.data.documents.length, 2);
+  assert.equal(first.data.has_more, true);
+  assert.equal(second.data.documents.length, 1);
+  assert.equal(second.data.has_more, false);
+  assert.deepEqual(new Set([...first.data.documents, ...second.data.documents].map(x => x.file_id)), new Set(ids));
+  await fixture.processDocument(kb, ids[0], 'parse');
+  const preview = await fixture.request(`${documentPath(kb, ids[0])}/content?offset=1&limit=2`);
+  assert.equal(preview.data.content, 'line two 0\nline three 0');
+  assert.equal(preview.data.start_line, 2);
+  assert.equal(preview.data.end_line, 3);
+  assert.equal(preview.data.total_lines, 4);
+  assert.equal(preview.data.has_more_after, true);
+  assert.equal(preview.data.next_offset, 3);
+  for (const page of ['offset=-1', 'limit=0', 'offset=1.5']) assert.equal((await fixture.request(`/api/databases/${kb}/documents?${page}`)).status, 400);
 });
 
-test('HTTP 200 parse business failure is not presented as a queued or completed operation', async t => {
-  const {request, fixture} = await setup(t);
-  const id = seed(fixture);
-  fixture.state.actionFailure = 'failed';
-  const result = await request(`/api/databases/software-docs/documents/${id}/parse`, {method: 'POST', body: {}});
-  assert.ok(result.status >= 400);
-  assert.ok(result.data.error);
-  assert.ok(!JSON.stringify(result.data).includes('SECRET'));
+test('owner credentials, documents, parsed text and indexed search survive a server restart', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary('Persistent library');
+  const content = 'Stored manual\nThe cerulean bookmark survives a restart.';
+  const id = await fixture.upload(kb, content);
+  await fixture.processDocument(kb, id, 'parse');
+  await fixture.processDocument(kb, id, 'index');
+  await fixture.restart();
+  assert.equal((await fixture.request('/api/status', {auth: null})).data.setupRequired, false);
+  await fixture.login();
+  assert.equal((await fixture.request('/api/databases')).data.databases[0].kb_id, kb);
+  assert.equal((await fixture.request(`${documentPath(kb, id)}/basic`)).data.meta.status, 'indexed');
+  assert.equal((await fixture.request(`${documentPath(kb, id)}/content`)).data.content, content);
+  assert.equal((await query(fixture, kb, 'cerulean'))[0].file_id, id);
 });
 
-test('deleted documents and revoked accounts cannot read cached data', async t => {
-  const {request, fixture} = await setup(t);
-  const id = seed(fixture);
-  const path = `/api/databases/software-docs/documents/${id}/content`;
-  assert.equal((await request(path, {role: 'reader'})).status, 200);
-  fixture.state.readerRevoked = true;
-  assert.equal((await request(path, {role: 'reader'})).status, 404);
-  fixture.state.readerRevoked = false;
-  assert.equal((await request(`/api/databases/software-docs/documents/${id}`, {method: 'DELETE'})).status, 200);
-  assert.equal((await request(path)).status, 404);
-  assert.equal((await request(path, {role: 'reader'})).status, 404);
+test('names and search input are handled as data, including SQL punctuation and literal HTML', async t => {
+  const fixture = await createFixture(t);
+  const name = "Notes'); DROP TABLE documents; -- <script>example</script>";
+  const kb = await fixture.createLibrary(name);
+  const id = await fixture.upload(kb, '<script>alert("example")</script>\nLiteral example text.');
+  await fixture.processDocument(kb, id, 'parse');
+  await fixture.processDocument(kb, id, 'index');
+  assert.equal((await fixture.request('/api/databases')).data.databases[0].name, name);
+  assert.equal((await fixture.request(`${documentPath(kb, id)}/content`)).data.content, '<script>alert("example")</script>\nLiteral example text.');
+  assert.deepEqual(await query(fixture, kb, "' OR 1=1 --"), []);
+  assert.ok((await query(fixture, kb, 'Literal')).length);
 });
 
-test('upstream errors preserve HTTP 401 and 403 without leaking internal detail', async t => {
-  const {request, fixture} = await setup(t);
-  for (const status of [401, 403]) {
-    fixture.state.faults.set('/api/auth/me', {status, body: {detail: 'SECRET password and internal stack'}});
-    const result = await request('/api/me');
-    assert.equal(result.status, status);
-    assert.ok(result.data.error);
-    assert.ok(!JSON.stringify(result.data).includes('SECRET'));
+test('unknown routes and encoded traversal do not expose files or unrelated features', async t => {
+  const fixture = await createFixture(t);
+  for (const path of ['/api/agents', '/api/proxy?url=https://example.com', '/api/databases/bad%2Fid/documents', '/api/databases/%252e%252e/documents', '/.env', '/server.mjs']) {
+    assert.ok([400, 404].includes((await fixture.request(path)).status), path);
   }
 });
 
-test('timeout, socket failure and malformed or oversized upstream responses are bounded errors', async t => {
-  const {request, fixture} = await setup(t, {timeoutMs: 100});
-  for (const [type, expected] of [['timeout', 504], ['disconnect', 502], ['invalid-json', 502], ['large', 502]]) {
-    fixture.state.faults.set('/api/auth/me', {type});
-    const result = await request('/api/me');
-    assert.equal(result.status, expected, type);
-    assert.ok(result.data.error, type);
-  }
-});
-
-test('a disconnected client aborts the outstanding upstream request', async t => {
-  const {request, fixture} = await setup(t, {timeoutMs: 5000});
-  fixture.state.faults.set('/api/auth/me', {type: 'timeout'});
-  const controller = new AbortController();
-  const pending = request('/api/me', {signal: controller.signal});
-  await until(() => fixture.state.audit.some(x => x.kind === 'request' && x.path === '/api/auth/me'));
-  controller.abort();
-  await assert.rejects(pending, {name: 'AbortError'});
-  await until(() => fixture.state.audit.some(x => x.kind === 'response_close' && x.path === '/api/auth/me' && !x.ended));
-});
-
-test('upstream redirect is rejected without following its Location', async t => {
-  const {request, fixture} = await setup(t);
-  fixture.state.faults.set('/api/auth/me', {type: 'redirect'});
-  const result = await request('/api/me');
-  assert.equal(result.status, 502);
-  assert.equal(result.data.error.code, 'UPSTREAM_REDIRECT_REJECTED');
-  assert.equal(fixture.state.audit.filter(x => x.kind === 'request' && x.path === '/__redirect_target').length, 0);
-});
-
-test('unapproved routes, upstream URL injection and encoded traversal never reach upstream', async t => {
-  const {request, fixture} = await setup(t);
-  for (const path of ['/api/agents', '/api/proxy?url=https://example.com', '/api/databases/bad%2Fid/documents', '/api/databases/%252e%252e/documents']) {
-    const result = await request(path);
-    assert.ok([400, 404].includes(result.status), path);
-  }
-  assert.equal(fixture.state.audit.filter(x => x.kind === 'request').length, 0);
-});
-
-test('Host and Origin are checked before credentials can be forwarded', async t => {
-  const {base, fixture} = await setup(t);
+test('Host, Origin and cross-site metadata are checked before local authenticated access', async t => {
+  const fixture = await createFixture(t);
   for (const headers of [{Host: 'attacker.example'}, {Origin: 'https://attacker.example'}, {'Sec-Fetch-Site': 'cross-site'}]) {
-    // Native HTTP preserves Host and Fetch Metadata exactly; fetch can rewrite
-    // these browser-controlled headers and would test a different request.
-    const result = await new Promise((resolve, reject) => {
-      const req = http.request(`${base}/api/me`, {headers: {...headers, Authorization: `Bearer ${FIXTURE_ACCOUNTS.admin.token}`}}, res => {
-        const chunks = [];
-        res.on('data', chunk => chunks.push(chunk));
-        res.on('end', () => resolve({status: res.statusCode, data: JSON.parse(Buffer.concat(chunks).toString())}));
+    const status = await new Promise((resolve, reject) => {
+      const request = http.request(`${fixture.base}/api/me`, {headers: {...headers, Authorization: `Bearer ${fixture.token}`}}, response => {
+        response.resume();
+        response.on('end', () => resolve(response.statusCode));
       });
-      req.on('error', reject);
-      req.end();
+      request.on('error', reject);
+      request.end();
     });
-    assert.ok([400, 403].includes(result.status));
+    assert.equal(status, 403);
   }
-  assert.equal(fixture.state.audit.filter(x => x.kind === 'request').length, 0);
+  assert.equal((await fixture.request('/api/me', {headers: {Origin: fixture.base}})).status, 200);
 });
 
-test('HTTP 200 deletion with an unrecognized body is rejected as unverified', async t => {
-  const {request, fixture} = await setup(t);
-  const id = seed(fixture);
-  for (const body of [{}, []]) {
-    fixture.state.faults.set(`/api/knowledge/databases/software-docs/documents/${id}`, {status: 200, body});
-    const result = await request(`/api/databases/software-docs/documents/${id}`, {method: 'DELETE'});
-    assert.equal(result.status, 502);
-    assert.ok(result.data.error);
-    assert.ok(fixture.state.documents.has(id), 'fixture did not actually delete anything');
+test('unsupported files, multi-file uploads, oversize bodies and invalid JSON are rejected', async t => {
+  const fixture = await createFixture(t);
+  const kb = await fixture.createLibrary();
+  const uploadPath = `/api/databases/${kb}/upload`;
+  assert.ok([400, 415].includes((await fixture.request(uploadPath, {method: 'POST', body: fileForm('program.exe')})).status));
+  const multiple = fileForm();
+  multiple.append('another-file', new Blob(['other document']), 'another.md');
+  assert.equal((await fixture.request(uploadPath, {method: 'POST', body: multiple})).status, 400);
+  assert.equal((await fixture.request(uploadPath, {method: 'POST', body: fileForm('large.md', 'x'.repeat(10 * 1024 * 1024 + 1))})).status, 413);
+  assert.equal((await fixture.request(`/api/databases/${kb}/query`, {method: 'POST', body: {query: 'x'.repeat(128 * 1024)}})).status, 413);
+  assert.equal((await fixture.request('/api/databases', {method: 'POST', rawBody: '{broken', headers: {'Content-Type': 'application/json'}})).status, 400);
+  assert.equal((await fixture.request('/api/databases', {method: 'POST', rawBody: '{}', headers: {'Content-Type': 'text/plain'}})).status, 415);
+  assert.equal((await fixture.request(`/api/databases/${kb}/documents`)).data.total, 0);
+});
+
+test('static UI and local APIs carry no-store, nosniff and restrictive CSP without CORS', async t => {
+  const fixture = await createFixture(t);
+  for (const path of ['/api/status', '/', '/app.js']) {
+    const response = await fetch(`${fixture.base}${path}`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control'), /no-store/);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.match(response.headers.get('content-security-policy'), /default-src 'none'/);
+    assert.match(response.headers.get('content-security-policy'), /connect-src 'self'/);
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+    await response.arrayBuffer();
   }
-});
-
-test('malformed query rows do not become apparent retrieval matches', async t => {
-  const {request, fixture} = await setup(t);
-  fixture.state.faults.set('/api/knowledge/databases/external/software-docs/retrieve', {status: 200, body: {results: [{}]}});
-  const result = await request('/api/databases/software-docs/query', {method: 'POST', body: {query: 'Save button'}});
-  assert.equal(result.status, 502);
-  assert.ok(result.data.error);
-});
-
-test('nested metadata cannot smuggle credentials through an allowed citation key', async t => {
-  const {request, fixture} = await setup(t);
-  fixture.state.faults.set('/api/knowledge/databases/external/software-docs/retrieve', {status: 200, body: {results: [{id: 'chunk-1', kb_id: 'software-docs', file_id: 'file-1', content: 'A software note.', metadata: {filename: 'guide.md', source: {password: 'SECRET_CREDENTIAL'}}}]}});
-  const result = await request('/api/databases/software-docs/query', {method: 'POST', body: {query: 'Save button'}});
-  assert.ok(!JSON.stringify(result.data).includes('SECRET_CREDENTIAL'));
-  if (result.status === 200) {
-    assert.equal(result.data.results[0].metadata.filename, 'guide.md');
-    assert.ok(result.data.results[0].metadata.source == null || typeof result.data.results[0].metadata.source !== 'object');
-  } else {
-    assert.equal(result.status, 502);
-    assert.ok(result.data.error);
-  }
-});
-
-test('only Markdown and text below 10 MiB are uploaded; JSON request body is bounded', async t => {
-  const {request, fixture} = await setup(t);
-  const type = await request('/api/databases/software-docs/upload', {method: 'POST', body: fileForm('program.exe')});
-  assert.ok([400, 415].includes(type.status));
-  const size = await request('/api/databases/software-docs/upload', {method: 'POST', body: fileForm('large.md', 'x'.repeat(10 * 1024 * 1024 + 1))});
-  assert.equal(size.status, 413);
-  const json = await request('/api/databases/software-docs/query', {method: 'POST', body: {query: 'x'.repeat(128 * 1024)}});
-  assert.equal(json.status, 413);
-  assert.equal(fixture.state.audit.filter(x => x.kind === 'upload').length, 0);
-});
-
-test('responses carry no-store, nosniff and CSP without enabling CORS', async t => {
-  const {request} = await setup(t);
-  const result = await request('/api/status', {role: null});
-  assert.match(result.headers.get('cache-control'), /no-store/);
-  assert.equal(result.headers.get('x-content-type-options'), 'nosniff');
-  assert.match(result.headers.get('content-security-policy'), /default-src 'none'/);
-  assert.match(result.headers.get('content-security-policy'), /connect-src 'self'/);
-  assert.equal(result.headers.get('access-control-allow-origin'), null);
 });

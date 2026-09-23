@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 
 // Execute the actual UI script against a minimal DOM. These are deterministic
-// session/race tests, not a substitute for browser or live-Yuxi acceptance.
+// session/race tests, not a substitute for browser or real storage acceptance.
 const script = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 class Element {
@@ -34,11 +34,16 @@ async function until(predicate) {
 }
 const drain = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 function harness(override = () => undefined) {
-  const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(match => [match[1], new Element()]));
+  const elements = new Map([...html.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)].map(match => {
+    const element = new Element();
+    element.hidden = /\shidden(?:\s|>)/.test(match[0]);
+    element.disabled = /\sdisabled(?:\s|>)/.test(match[0]);
+    return [match[1], element];
+  }));
   const calls = [];
   const document = {getElementById(id) { assert.ok(elements.has(id), `Missing actual HTML id: ${id}`); return elements.get(id); }, createElement() { return new Element(); }};
   const win = new Element(); win.confirm = () => true;
-  const libraries = ['a', 'b'].map(kb_id => ({kb_id, name: `Library ${kb_id}`, kb_type: 'milvus', supports_documents: true, can_manage: true}));
+  const libraries = ['a', 'b'].map(kb_id => ({kb_id, name: `Library ${kb_id}`, kb_type: 'local', supports_documents: true, can_manage: true}));
   const context = vm.createContext({
     document, window: win, AbortController, FormData, setTimeout, clearTimeout, console,
     fetch: async (path, options) => {
@@ -46,8 +51,9 @@ function harness(override = () => undefined) {
       const special = override(call);
       if (special !== undefined) return special;
       const route = path.split('?')[0];
-      if (route === '/api/status') return json({backendConfigured: true, backendReachable: true});
-      if (route === '/api/login') return json({access_token: 'synthetic-admin-token'});
+      if (route === '/api/status') return json({backendConfigured: true, backendReachable: true, setupRequired: false});
+      if (route === '/api/login' || route === '/api/setup') return json({access_token: 'synthetic-admin-token'});
+      if (route === '/api/logout') return json({status: 'success'});
       if (route === '/api/me') return json({user: {name: 'Synthetic admin'}});
       if (route === '/api/databases') return json({databases: libraries, canCreate: true});
       const docs = /^\/api\/databases\/(a|b)\/documents$/.exec(route);
@@ -60,8 +66,8 @@ function harness(override = () => undefined) {
   vm.runInContext(script, context, {filename: 'actual-public-app.js'});
   const el = id => elements.get(id);
   return {el, calls, async login() {
-    await until(() => !el('key-submit').disabled);
-    el('choose-key').fire('click'); el('api-key').value = 'synthetic-admin-token'; el('key-form').fire('submit');
+    await until(() => !el('login-submit').disabled);
+    el('username').value = 'synthetic-owner'; el('password').value = 'only-test-password'; el('login-form').fire('submit');
     await until(() => el('library-list').children.length === 2);
   }, async select(index) {
     el('library-list').children[index].fire('click');

@@ -1,9 +1,11 @@
 {
-  "name": "yuxi-independent-library",
-  "version": "0.1.0",
+  "name": "standalone-document-library",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "engines": {"node": ">=24"},
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node server.mjs",
     "test": "node scripts/test.mjs",

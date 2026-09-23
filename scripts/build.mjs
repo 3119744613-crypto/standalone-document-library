@@ -7,8 +7,8 @@ import {spawnSync} from 'node:child_process';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const check = spawnSync(process.execPath, ['--check', resolve(root, 'public/app.js')], {encoding: 'utf8'});
 if (check.status !== 0) throw new Error(`JavaScript syntax check failed: ${check.stderr}`);
-const lock = JSON.parse(await readFile(resolve(root, 'upstream.lock.json'), 'utf8'));
-const manifest = {upstream: lock, files: {}};
+const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
+const manifest = {name: pkg.name, version: pkg.version, backend: 'local-sqlite', files: {}};
 await mkdir(resolve(root, 'dist'), {recursive: true});
 for (const name of ['index.html', 'app.js', 'styles.css']) {
   const source = resolve(root, 'public', name);

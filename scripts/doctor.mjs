@@ -1,20 +1,24 @@
-import {spawnSync} from 'node:child_process';
+import {mkdtemp, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 
-const major = Number(process.versions.node.split('.')[0]);
-const configured = Boolean(process.env.YUXI_LIBRARY_UPSTREAM?.trim());
-const docker = spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], {
-  encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'],
-});
-const result = {
-  node: process.versions.node,
-  platform: `${process.platform}/${process.arch}`,
-  libraryUiCanStart: major >= 24,
-  upstreamConfigured: configured,
-  dockerCommandAvailable: docker.error?.code !== 'ENOENT',
-  dockerDaemonReady: docker.status === 0,
-  realYuxiAcceptance: 'NOT_RUN',
-  note: 'Docker is unnecessary for this independent connector when an existing Yuxi server is supplied. The official local Yuxi backend has separate deployment dependencies.',
-};
+const result = {node: process.versions.node, platform: `${process.platform}/${process.arch}`, nodeSupported: Number(process.versions.node.split('.')[0]) >= 24, sqliteWritable: false, externalServicesRequired: false};
+let scratch;
+try {
+  if (!result.nodeSupported) throw new Error('Node.js 24 or newer is required.');
+  const {DatabaseSync} = await import('node:sqlite');
+  scratch = await mkdtemp(join(tmpdir(), 'library-doctor-'));
+  const db = new DatabaseSync(join(scratch, 'check.sqlite'));
+  try {
+    db.exec("CREATE TABLE probe(value TEXT); INSERT INTO probe VALUES ('local')");
+    result.sqliteWritable = db.prepare('SELECT value FROM probe').get().value === 'local';
+    result.sqliteVersion = db.prepare('SELECT sqlite_version() AS version').get().version;
+  } finally { db.close(); }
+  result.note = 'Runtime and temporary SQLite write checked. Your configured data directory is checked on server startup; lifecycle acceptance is separate.';
+} catch (error) {
+  result.error = error.code || 'RUNTIME_CHECK_FAILED';
+  process.exitCode = 1;
+} finally {
+  if (scratch) await rm(scratch, {recursive: true, force: true});
+}
 console.log(JSON.stringify(result, null, 2));
-if (major < 24) process.exitCode = 1;
-else if (!configured) process.exitCode = 2;

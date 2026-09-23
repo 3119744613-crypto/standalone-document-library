@@ -1,12 +1,12 @@
 // Credentials, account data and document text live only in this page's memory.
-// All routes below are the local BFF contract, never guessed upstream routes.
+// All routes below belong to this local document library.
 const $ = id => document.getElementById(id);
 const state = {
   token: '', account: null, accountEpoch: 0, libraryEpoch: 0,
   libraries: [], selected: null, documents: [], canCreate: false, canManage: false,
   docOffset: 0, docHasMore: false, preview: null, configured: false, reachable: false,
   requests: new Map(), operations: new Map(), processing: new Map(), docTotal: 0,
-  authMethod: 'login', authPending: false,
+  setupRequired: null, authPending: false,
 };
 class StaleRequest extends Error {}
 class ApiError extends Error {
@@ -67,11 +67,11 @@ async function request(path, {key = path, method = 'GET', body, auth = true, sco
   } catch (error) {
     if (error instanceof StaleRequest || (stamp && !current(stamp)) || state.requests.get(key) !== item) throw new StaleRequest();
     if (error.name === 'AbortError') {
-      if (timedOut) throw new ApiError('请求超时，请检查 Yuxi 服务状态后重试。');
+      if (timedOut) throw new ApiError('请求超时，请检查本地资料库是否仍在运行后重试。');
       throw new StaleRequest();
     }
     if (error instanceof ApiError) throw error;
-    throw new ApiError('无法连接服务。请检查独立模块与 Yuxi 后端是否在线。');
+    throw new ApiError('无法连接服务。请检查本地资料库是否仍在运行。');
   } finally {
     clearTimeout(timeout);
     if (state.requests.get(key) === item) state.requests.delete(key);
@@ -105,72 +105,99 @@ function clearAccount() {
   clearLibrary(); state.token = ''; state.account = null; state.libraries = []; state.canCreate = false; state.authPending = false;
   $('workspace').hidden = true; $('auth-section').hidden = false; $('account-label').textContent = '';
   $('library-list').replaceChildren(); message('library-message'); message('create-message');
-  $('create-dialog').close(); $('create-form').reset(); $('username').value = ''; $('password').value = ''; $('api-key').value = '';
+  $('create-dialog').close(); $('create-form').reset(); $('username').value = ''; $('password').value = '';
   $('create-submit').disabled = false;
-  $('login-submit').disabled = !state.reachable; $('key-submit').disabled = !state.reachable;
+  renderAuth();
 }
-function chooseAuth(method) {
-  if (state.authPending) { clearAccount(); message('global-message', '已取消先前的身份验证，请使用当前方式重新连接。'); }
-  state.authMethod = method;
-  $('login-form').hidden = method !== 'login'; $('key-form').hidden = method !== 'key';
-  for (const name of ['login', 'key']) {
-    $(`choose-${name}`).classList.toggle('active', name === method);
-    $(`choose-${name}`).setAttribute('aria-pressed', String(name === method));
-  }
-  $('password').value = ''; $('api-key').value = '';
+function renderAuth() {
+  const setup = state.setupRequired === true;
+  $('auth-title').textContent = setup ? '设置本机管理员' : '登录本地资料库';
+  $('auth-help').textContent = setup
+    ? '首次使用，请设置一个本机账号。文档和账号保存在这台电脑，本版本供单人使用。'
+    : '使用你在这台电脑设置的账号。登录凭据只保留在当前页面，刷新后需重新登录。';
+  $('password').setAttribute('minlength', setup ? '10' : '1');
+  $('password').setAttribute('autocomplete', setup ? 'new-password' : 'current-password');
+  $('password-help').textContent = setup ? '设置至少 10 个字符的密码，请妥善记住。' : '输入创建本机管理员时设置的密码。';
+  $('login-submit').textContent = setup ? '创建账号并进入' : '登录资料库';
+  $('login-submit').disabled = !state.reachable || state.setupRequired === null || state.authPending;
+  $('cancel-login').hidden = !state.authPending;
+}
+function readyMessage() {
+  if (state.setupRequired === true) return '本地资料库已启动，请创建本机账号。';
+  if (state.setupRequired === false) return '本地资料库已就绪；文档保存在此电脑，索引后可按关键词检索。';
+  return '正在确认本机账号状态，请重新检查服务。';
 }
 async function checkStatus() {
   const op = beginOperation('status', {global: true});
+  const accountEpoch = state.accountEpoch;
   $('refresh-status').disabled = true;
   try {
     const data = await request('/api/status', {key: 'status', auth: false, scope: 'global'});
     state.configured = data.backendConfigured === true; state.reachable = data.backendReachable === true;
-    $('connection-title').textContent = !state.configured ? '独立模块已启动 · 等待 Yuxi 地址' : state.reachable ? 'Yuxi 后端可连接' : 'Yuxi 后端未连接';
-    $('connection-message').textContent = text(data.message) || (!state.configured ? '请为独立模块配置 YUXI_LIBRARY_UPSTREAM，然后重启服务。' : state.reachable ? '登录后可访问你有权限的资料库。' : '请检查后端地址与服务运行状态。');
-    $('backend-address').textContent = text(data.backendUrl) || '尚未配置后端地址';
-    $('backend-version').textContent = data.upstreamCommit ? `接口参考版本 ${text(data.upstreamCommit).slice(0, 12)}` : '';
+    if (accountEpoch === state.accountEpoch) {
+      state.setupRequired = typeof data.setupRequired === 'boolean' ? data.setupRequired : null;
+    }
+    $('connection-title').textContent = state.reachable ? '本地服务已就绪' : '本地服务暂不可用';
+    $('connection-message').textContent = state.reachable ? readyMessage() : text(data.message) || '请检查本地资料库的运行状态。';
+    $('backend-address').textContent = '本机保存 · 单人使用';
+    $('backend-version').textContent = '关键词检索 · 无需模型服务';
     $('connection-dot').className = `status-dot ${state.reachable ? 'good' : 'bad'}`;
   } catch (error) {
     if (error instanceof StaleRequest) return;
     state.reachable = false;
-    $('connection-title').textContent = '无法连接独立模块服务';
+    $('connection-title').textContent = '无法连接本地资料库';
     $('connection-message').textContent = error.message;
     $('connection-dot').className = 'status-dot bad';
   } finally {
-    if (activeOperation(op)) {
-      $('refresh-status').disabled = false;
-      $('login-submit').disabled = !state.reachable || state.authPending; $('key-submit').disabled = !state.reachable || state.authPending;
-    }
+    if (activeOperation(op)) { $('refresh-status').disabled = false; renderAuth(); }
   }
 }
-async function authenticate(event, method) {
+async function authenticate(event) {
   event.preventDefault();
-  const username = $('username').value.trim(), password = $('password').value, apiKey = $('api-key').value.trim();
+  if (state.authPending || !state.reachable || state.setupRequired === null) return;
+  const username = $('username').value.trim(), password = $('password').value;
+  const setup = state.setupRequired;
+  if (!username || !password) { message('global-message', '请填写用户名和密码。', 'error'); return; }
+  if (setup && password.length < 10) { message('global-message', '首次设置的密码需要至少 10 个字符。', 'error'); return; }
   clearAccount(); const stamp = snapshot(false); const op = beginOperation('authenticate', {library: false}); state.authPending = true;
-  $('login-submit').disabled = true; $('key-submit').disabled = true;
-  message('global-message', '正在验证独立 Yuxi 身份…');
+  renderAuth(); message('global-message', setup ? '正在创建本机管理员…' : '正在登录本地资料库…');
   try {
-    if (method === 'login') {
-      const data = await request('/api/login', {key: 'login', method: 'POST', body: {username, password}, auth: false, scope: 'account'});
-      if (!text(data.access_token)) throw new ApiError('登录响应缺少访问令牌，未建立登录状态。');
-      state.token = data.access_token;
-    } else state.token = apiKey;
+    const result = await request(setup ? '/api/setup' : '/api/login', {key: 'login', method: 'POST', body: {username, password}, auth: false, scope: 'account'});
+    if (!text(result.access_token)) throw new ApiError('服务响应缺少访问令牌，未建立登录状态。');
+    state.token = result.access_token;
+    if (setup) { state.setupRequired = false; $('connection-message').textContent = readyMessage(); }
     const data = await request('/api/me', {key: 'me', scope: 'account'});
     if (!current(stamp)) return;
     if (!data.user || typeof data.user !== 'object' || Array.isArray(data.user)) throw new ApiError('身份响应格式无效，未建立登录状态。');
     state.account = data.user;
-    $('account-label').textContent = text(state.account.name) || text(state.account.username) || (method === 'key' ? 'API Key 已验证' : 'Yuxi 用户');
+    $('account-label').textContent = text(state.account.name) || text(state.account.username) || '本机管理员';
     $('auth-section').hidden = true; $('workspace').hidden = false;
     message('global-message'); await loadLibraries();
   } catch (error) {
     if (error instanceof StaleRequest) return;
     clearAccount(); message('global-message', error.message, 'error');
+    if (setup) void checkStatus();
   } finally {
-    if (activeOperation(op)) {
-      state.authPending = false; $('password').value = ''; $('api-key').value = '';
-      $('login-submit').disabled = !state.reachable; $('key-submit').disabled = !state.reachable;
-    }
+    if (activeOperation(op)) { state.authPending = false; $('password').value = ''; renderAuth(); }
   }
+}
+async function logout() {
+  const token = state.token;
+  clearAccount(); const epoch = state.accountEpoch;
+  message('global-message', '本页凭据、文档和查询结果已清空。正在注销会话…');
+  if (!token) { message('global-message', '已退出，当前页面的资料已清空。'); return; }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch('/api/logout', {
+      method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'}, body: '{}',
+      credentials: 'omit', cache: 'no-store', redirect: 'error', signal: controller.signal,
+    });
+    if (!response.ok && response.status !== 401) throw new Error('logout unavailable');
+    if (state.accountEpoch === epoch) message('global-message', '已退出，会话已注销，本页资料已清空。');
+  } catch {
+    if (state.accountEpoch === epoch) message('global-message', '本页凭据和资料已清空；服务未确认会话注销，原会话将在到期后失效。', 'warn');
+  } finally { clearTimeout(timer); }
 }
 function renderLibraries() {
   $('library-list').replaceChildren();
@@ -211,7 +238,7 @@ function selectLibrary(library) {
   clearLibrary(); state.selected = library; state.canManage = library.can_manage === true;
   $('no-library').hidden = true; $('library-detail').hidden = false;
   $('library-title').textContent = text(library.name) || '未命名资料库';
-  $('library-description').textContent = text(library.description); $('library-type').textContent = text(library.kb_type) || '资料库';
+  $('library-description').textContent = text(library.description); $('library-type').textContent = library.kb_type === 'local' ? '本地资料库' : text(library.kb_type) || '资料库';
   $('upload-form').hidden = !state.canManage || library.supports_documents === false;
   renderLibraries(); showPane('documents');
   if (library.supports_documents === false) {
@@ -230,6 +257,7 @@ function actionButton(label, action, {danger = false, disabled = false} = {}) {
   const button = document.createElement('button'); button.type = 'button'; button.className = `mini-button${danger ? ' danger' : ''}`;
   button.textContent = label; button.disabled = disabled; button.addEventListener('click', action); return button;
 }
+const canProcess = (doc, action) => (action === 'parse' ? ['uploaded', 'error_parsing'] : ['parsed', 'error_indexing']).includes(doc.status);
 function renderDocuments(total = state.docTotal) {
   state.docTotal = Number.isFinite(Number(total)) ? Number(total) : state.documents.length;
   $('document-count').textContent = String(state.docTotal);
@@ -242,12 +270,15 @@ function renderDocuments(total = state.docTotal) {
     const pending = state.processing.get(doc.file_id);
     const pendingLabel = pending ? `${pending.action === 'parse' ? '解析' : '索引'}${pending.phase === 'submitting' ? '正在提交' : '已排队，待确认状态'}` : '';
     status.textContent = doc.is_folder ? '文件夹' : pendingLabel || statusLabels[doc.status] || text(doc.status) || '状态未知'; statusCell.append(status);
+    if (text(doc.status).startsWith('error') && text(doc.error_message)) {
+      const failure = document.createElement('small'); failure.className = 'document-error'; failure.textContent = text(doc.error_message); statusCell.append(failure);
+    }
     const actions = document.createElement('div'); actions.className = 'document-actions';
     if (!doc.is_folder) actions.append(actionButton('原文', () => viewContent(doc)));
     if (state.canManage && !doc.is_folder) {
       const busy = Boolean(pending) || ['parsing','indexing'].includes(doc.status);
-      actions.append(actionButton('解析', () => processDocument(doc, 'parse'), {disabled:busy}));
-      actions.append(actionButton('索引', () => processDocument(doc, 'index'), {disabled:busy}));
+      actions.append(actionButton('解析', () => processDocument(doc, 'parse'), {disabled:busy || !canProcess(doc, 'parse')}));
+      actions.append(actionButton('索引', () => processDocument(doc, 'index'), {disabled:busy || !canProcess(doc, 'index')}));
       actions.append(actionButton('删除', () => deleteDocument(doc), {danger:true}));
     }
     actionCell.append(actions); row.append(nameCell,statusCell,actionCell); $('document-rows').append(row);
@@ -264,7 +295,7 @@ async function loadDocuments(append = false) {
     const documents = data.documents;
     for (const doc of documents) {
       const pending = state.processing.get(doc.file_id);
-      // Queuing does not immediately change Yuxi's persisted file status.
+      // Queue acceptance is distinct from a persisted processing result.
       // Keep the lock until a refresh observes a real state/version change.
       if (pending?.phase === 'queued' && (doc.status !== pending.initialStatus
           || (doc.updated_at != null && doc.updated_at !== pending.initialUpdatedAt))) {
@@ -298,12 +329,12 @@ async function uploadDocument(event) {
     if (data.staged || data.registrationFailed) throw new ApiError('文件已暂存但登记失败，尚未加入资料库。',0,data);
     if (data.status !== 'success' || !data.document?.file_id) throw new ApiError('后端未确认文档登记成功，请刷新实际文档状态。');
     $('document-file').value = ''; await loadDocuments();
-    if (activeOperation(op)) message('documents-message','文档已上传并登记。解析和索引需要分别提交。','success');
+    if (activeOperation(op)) message('documents-message','文档已上传。请先解析，再建立索引，完成后即可检索。','success');
   } catch(error) { if(activeOperation(op)) report('documents-message',error); }
   finally { if(activeOperation(op)) $('upload-submit').disabled=false; }
 }
 async function processDocument(doc, action) {
-  if (!state.selected || !state.canManage || state.processing.has(doc.file_id)) return;
+  if (!state.selected || !state.canManage || state.processing.has(doc.file_id) || !canProcess(doc, action)) return;
   const stamp = snapshot(); const label = action === 'parse' ? '解析' : '索引';
   const pending = {action, phase: 'submitting', initialStatus: doc.status, initialUpdatedAt: doc.updated_at};
   state.processing.set(doc.file_id, pending); renderDocuments();
@@ -376,14 +407,14 @@ async function queryLibrary(event) {
     const data=await request(`${libraryPath()}/query`,{key:'query',method:'POST',body:{query}});
     if(!Array.isArray(data.results))throw new ApiError('查询响应格式无效，不能判断是否存在匹配资料。');
     const results=data.results;
-    $('answer-text').textContent=results.length?`找到 ${results.length} 条匹配资料。以下为后端返回的内容与出处。`:'未找到匹配资料。';
+    $('answer-text').textContent=results.length?`找到 ${results.length} 条匹配资料。以下为原文中的关键词匹配与出处。`:'未找到匹配资料。';
     $('source-heading').hidden=!results.length;
     for(const [index,result]of results.entries()){
       const card=document.createElement('article');card.className='source-card';
       const title=document.createElement('strong'),meta=document.createElement('small'),content=document.createElement('p');
       const metadata=result.metadata&&typeof result.metadata==='object'?result.metadata:{};
       title.textContent=`${index+1}. ${text(metadata.filename)||text(metadata.file_name)||text(metadata.title)||text(metadata.source)||text(metadata.source_path)||text(result.file_id)||'未提供文档名称'}`;
-      const details=[metadata.source_path?`来源 ${text(metadata.source_path)}`:'',metadata.page!==undefined?`页 ${text(metadata.page)}`:'',metadata.start_line!==undefined?`行 ${text(metadata.start_line)}`:'',result.file_id?`文档 ${text(result.file_id)}`:'',result.id?`结果 ${text(result.id)}`:''].filter(Boolean);
+      const details=[metadata.source_path?`来源 ${text(metadata.source_path)}`:'',metadata.page!==undefined?`页 ${text(metadata.page)}`:'',metadata.start_line!==undefined?`行 ${text(metadata.start_line)}${metadata.end_line!==undefined&&metadata.end_line!==metadata.start_line?`–${text(metadata.end_line)}`:''}`:'',result.file_id?`文档 ${text(result.file_id)}`:'',result.id?`结果 ${text(result.id)}`:''].filter(Boolean);
       meta.textContent=details.join(' · ')||'后端未提供更详细的来源信息。';
       content.textContent=text(result.content);card.append(title,meta,content);
       if(result.file_id)card.append(actionButton('查看原文',()=>viewContent({file_id:result.file_id,filename:text(metadata.filename)||text(metadata.file_name)||text(metadata.title)||'查询来源'})));
@@ -395,9 +426,9 @@ async function queryLibrary(event) {
 }
 async function createLibrary(event){
   event.preventDefault();if(!state.canCreate)return;
-  const op=beginOperation('create-library',{library:false});const model=$('create-model').value.trim();
-  if(!model){message('create-message','请填写 Yuxi 已配置的 embedding_model_spec 模型标识字符串。','error');return;}
-  const body={database_name:$('create-name').value.trim(),description:$('create-description').value.trim(),kb_type:$('create-type').value,embedding_model_spec:model};
+  const op=beginOperation('create-library',{library:false});
+  const body={database_name:$('create-name').value.trim(),description:$('create-description').value.trim()};
+  if(!body.database_name){message('create-message','请填写资料库名称。','error');return;}
   $('create-submit').disabled=true;message('create-message','正在创建资料库…');
   try{
     await request('/api/databases',{key:'create-library',method:'POST',body,scope:'account'});
@@ -406,12 +437,10 @@ async function createLibrary(event){
   }catch(error){if(activeOperation(op))report('create-message',error);}
   finally{if(activeOperation(op))$('create-submit').disabled=false;}
 }
-$('choose-login').addEventListener('click',()=>chooseAuth('login'));
-$('choose-key').addEventListener('click',()=>chooseAuth('key'));
-$('login-form').addEventListener('submit',event=>void authenticate(event,'login'));
-$('key-form').addEventListener('submit',event=>void authenticate(event,'key'));
+$('login-form').addEventListener('submit',event=>void authenticate(event));
+$('cancel-login').addEventListener('click',()=>{clearAccount();message('global-message','已停止等待本次登录。首次设置可能已完成，可检查服务状态后重新登录。');void checkStatus();});
 $('refresh-status').addEventListener('click',()=>void checkStatus());
-$('logout').addEventListener('click',()=>{clearAccount();message('global-message','已退出，当前页面的凭据、文档和查询结果已清空。');});
+$('logout').addEventListener('click',()=>void logout());
 $('refresh-libraries').addEventListener('click',()=>void loadLibraries());
 $('show-documents').addEventListener('click',()=>showPane('documents'));
 $('show-query').addEventListener('click',()=>showPane('query'));
