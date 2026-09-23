@@ -1,0 +1,148 @@
+{
+  "repository": "https://github.com/xerrors/Yuxi",
+  "commit": "d633378c7ea55618ac659a547bfe90f74b29af4c",
+  "commit_time": "2026-09-21T11:17:49+08:00",
+  "reference_version": "0.7.3 (backend/pyproject.toml; not a verified release tag)",
+  "reviewed_at": "2026-09-22T23:37:18.603178+08:00",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2025 Yuxi Project Contributors",
+    "notice": "third-party/YUXI-LICENSE",
+    "scope": "Yuxi source only; third-party services retain their own licenses"
+  },
+  "source_files": [
+    {
+      "path": "LICENSE",
+      "sha256": "93ae1dca19d82831cfd514eb0f148f326a27f8d2d757662e8e2703a48658543e",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/LICENSE"
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "sha256": "73ee7aab2c0890f3581e400a477aa9c0c1f1a81ca72a2168b156c10e9248e826",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/ARCHITECTURE.md"
+    },
+    {
+      "path": "docker-compose.yml",
+      "sha256": "01cfe5a77d6f90fc80c0d113d2d21aeef92d7b4a5486381bfde7f8abbde8ff9e",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/docker-compose.yml"
+    },
+    {
+      "path": "backend/pyproject.toml",
+      "sha256": "2afbade1cece907b16fbbfd750643ff81dff20cf7ed9a0ac76dff7751bd44595",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/pyproject.toml"
+    },
+    {
+      "path": "backend/package/pyproject.toml",
+      "sha256": "6c840eb768a59b54a9d1ed1915f013e0428e429751d40e805e16e9fd58ea206c",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/pyproject.toml"
+    },
+    {
+      "path": "backend/server/main.py",
+      "sha256": "65844776051735dfabd1b57cb3423a71de4976b40fb77110bced353e4a3423dc",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/main.py"
+    },
+    {
+      "path": "backend/server/routers/__init__.py",
+      "sha256": "3bab7b1cb8f782a921d84e091ffa1b8a000c58e6bc3d1d8fad307f1936892939",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/routers/__init__.py"
+    },
+    {
+      "path": "backend/server/routers/auth_router.py",
+      "sha256": "66095bc0ab67ce4a4f17c2b42e67205d0b9d27dd1e0f3812d1e8871a500ff954",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/routers/auth_router.py"
+    },
+    {
+      "path": "backend/server/routers/knowledge_router.py",
+      "sha256": "087e46e18f9c66be787bc85fb28ff525bdce098392b4633cb80950a00898cd2b",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/routers/knowledge_router.py"
+    },
+    {
+      "path": "backend/server/routers/external_kb_router.py",
+      "sha256": "0310941ac322afad712aba19589e72b58f128776673c9db80a24b96dd7f694cb",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/routers/external_kb_router.py"
+    },
+    {
+      "path": "backend/server/routers/workspace_router.py",
+      "sha256": "616c15094e226d92af79988c6d07c142c97fc5e7d8bf106511cfac45d6fd6dbe",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/routers/workspace_router.py"
+    },
+    {
+      "path": "backend/server/utils/auth_middleware.py",
+      "sha256": "715a99469264ff66cdb94523350d18658d47ac92917fbbde9c92add887d32d27",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/utils/auth_middleware.py"
+    },
+    {
+      "path": "backend/server/utils/knowledge_permissions.py",
+      "sha256": "43c4f7335bd77a1258ce45a13506ef1dbaf7543989a6f3ab9e5a199f0a7957eb",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/utils/knowledge_permissions.py"
+    },
+    {
+      "path": "backend/server/utils/knowledge_response.py",
+      "sha256": "f282c7498355e4d6f1879cc392fc9c983c1c09499154b73282467ba93ffd6da6",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/utils/knowledge_response.py"
+    },
+    {
+      "path": "backend/server/utils/lifespan.py",
+      "sha256": "6612c60bf93a7e0f631fcad762a25ff1f9301bdeb64987b009a8c69e4deb7f6d",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/server/utils/lifespan.py"
+    },
+    {
+      "path": "backend/package/yuxi/knowledge/base.py",
+      "sha256": "e58c76aef36bee716866372db491a161d543e0aef6ca1866b6c36229b0063713",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/knowledge/base.py"
+    },
+    {
+      "path": "backend/package/yuxi/knowledge/schemas.py",
+      "sha256": "5665a63656954cd7fffc2d65c1eb0da926ed679e3b95cf64c25f715b2534c33b",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/knowledge/schemas.py"
+    },
+    {
+      "path": "backend/package/yuxi/knowledge/manager.py",
+      "sha256": "b6c93c33f21c1c139ba082c9d786efe9dd6e817a265255d648399e01597ae52b",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/knowledge/manager.py"
+    },
+    {
+      "path": "backend/package/yuxi/knowledge/runtime.py",
+      "sha256": "e72f03b053f12e221a6b1969cc50398aae1a6eb62982f00311df932daeebe997",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/knowledge/runtime.py"
+    },
+    {
+      "path": "backend/package/yuxi/knowledge/implementations/milvus.py",
+      "sha256": "361023eae6168460df321022a8b252eb516daced2f56248e6a06eb46bbd3721d",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/knowledge/implementations/milvus.py"
+    },
+    {
+      "path": "backend/package/yuxi/knowledge/utils/kb_utils.py",
+      "sha256": "b2ef328dcdabba919f862b3e66e8496347d9d0a3981dcbca96bc0dbb28148069",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/knowledge/utils/kb_utils.py"
+    },
+    {
+      "path": "backend/package/yuxi/agents/backends/sandbox/provider.py",
+      "sha256": "59a30be562f6ed5bf7e2b4611b8e69246d9f52fabddee7fc28e8f02558cc7285",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/agents/backends/sandbox/provider.py"
+    },
+    {
+      "path": "backend/package/yuxi/utils/auth_utils.py",
+      "sha256": "2030d692dae4f99d72acf6eeb419301ad997bc1f95fa3983d9de5bde4bb810d9",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/backend/package/yuxi/utils/auth_utils.py"
+    },
+    {
+      "path": "web/src/apis/knowledge_api.js",
+      "sha256": "942e50281c7bae72799d23c1fa34690b4baf34f45637e5155a386ced408c4752",
+      "url": "https://github.com/xerrors/Yuxi/blob/d633378c7ea55618ac659a547bfe90f74b29af4c/web/src/apis/knowledge_api.js"
+    }
+  ],
+  "version_boundary": {
+    "authoritative": "Local git clone HEAD and bytes hashed above",
+    "discarded_web_main_cache_commit": "e460fad6f19c012cd75b06dcea20b3c066e9db59",
+    "observed_latest_release_url": "https://github.com/xerrors/Yuxi/releases/tag/v0.7.2",
+    "note": "Earlier web main content and release/latest differ from local current HEAD; the adapter review uses only the locked commit."
+  },
+  "execution_boundary": {
+    "upstream_started": false,
+    "upstream_live_http_verified": false,
+    "database_migrated": false,
+    "provider_called": false,
+    "reason": "No Docker/Colima/Podman or configured isolated Yuxi instance; official current source has no supported lightweight knowledge-only runtime."
+  }
+}
